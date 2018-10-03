@@ -28,8 +28,11 @@
 using namespace std;
 
 void SetAlsaMasterVolume(long volume);
+void setLaunchpadVolume(long volume);
 
 bool stillRunning = true;
+RtMidiOut *midiOutput = NULL;
+RtMidiIn *midiInput = NULL;
 
 static void finish(int ignore) { stillRunning = false; }
 
@@ -37,7 +40,8 @@ int main(int argc, char *argv[])
 {
 
   // Init launchpad
-  RtMidiIn *midiInput = new RtMidiIn();
+  midiInput = new RtMidiIn();
+  midiOutput = new RtMidiOut();
   int midiPortCount = midiInput->getPortCount();
   cout << "Choose midi device:\n";
   for (int i = 0; i < midiPortCount; i++)
@@ -52,8 +56,17 @@ int main(int argc, char *argv[])
     exit(1);
   }
   midiInput->openPort(choosen);
+  midiOutput->openPort(choosen);
 
-  std::vector<unsigned char> message;
+  std::vector<unsigned char> message(3);
+
+  // Clear the launchpad
+  message[0] = 176;
+  message[1] = 0;
+  message[2] = 0;
+
+  midiOutput->sendMessage(&message);
+
   // Signal handler
   signal(SIGINT, finish);
   while (stillRunning)
@@ -72,15 +85,16 @@ int main(int argc, char *argv[])
     if ((message[1] - 8) % 16 != 0)
       continue;
     // Change the volume
-    int pressedButton = (float(message[1]) - 8.0) / 16.0;
+    int pressedButton = 7 - (float(message[1]) - 8.0) / 16.0;
     float newVolume = pressedButton * (100.0 / 7.0);
     SetAlsaMasterVolume(newVolume);
+    setLaunchpadVolume(newVolume);
   }
 
   return EXIT_SUCCESS;
 }
 
-// Set the master volume, the parametre must be between 0 and 100
+// Set the master volume, the parameter must be between 0 and 100
 void SetAlsaMasterVolume(long volume)
 {
   long min, max;
@@ -103,4 +117,20 @@ void SetAlsaMasterVolume(long volume)
   snd_mixer_selem_set_playback_volume_all(elem, volume * max / 100);
 
   snd_mixer_close(handle);
+}
+
+void setLaunchpadVolume(long volume)
+{
+  // Numbers to be shown in the launchpad
+  int bottonNumber = volume / (100 / 7) + 1;
+  cout << bottonNumber << endl;
+  std::vector<unsigned char> message(3);
+  for (int i = 0; i < 8; i++)
+  {
+    message[0] = 144;
+    message[1] = i * 16 + 8;
+    message[2] = 8 - i <= bottonNumber ? 3 : 0;
+
+    midiOutput->sendMessage(&message);
+  }
 }

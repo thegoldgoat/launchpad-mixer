@@ -22,11 +22,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <iostream>
+#include <signal.h>
+#include <unistd.h>
 
 using namespace std;
 
 void SetAlsaMasterVolume(long volume);
-void launchpadMidiCallback(double, std::vector<unsigned char> *, void *);
+
+bool stillRunning = true;
+
+static void finish(int ignore) { stillRunning = false; }
 
 int main(int argc, char *argv[])
 {
@@ -47,12 +52,30 @@ int main(int argc, char *argv[])
     exit(1);
   }
   midiInput->openPort(choosen);
-  midiInput->setCallback(launchpadMidiCallback);
 
-  midiInput->getMessage()
+  std::vector<unsigned char> message;
+  // Signal handler
+  signal(SIGINT, finish);
+  while (stillRunning)
+  {
+    midiInput->getMessage(&message);
 
-  sleep(10);
-  SetAlsaMasterVolume(100);
+    usleep(10000);
+
+    if (message.size() != 3)
+      continue;
+
+    if (message[0] != 144)
+      continue;
+    if (message[2] != 127)
+      continue;
+    if ((message[1] - 8) % 16 != 0)
+      continue;
+    // Change the volume
+    int pressedButton = (float(message[1]) - 8.0) / 16.0;
+    float newVolume = pressedButton * (100.0 / 7.0);
+    SetAlsaMasterVolume(newVolume);
+  }
 
   return EXIT_SUCCESS;
 }
@@ -80,19 +103,4 @@ void SetAlsaMasterVolume(long volume)
   snd_mixer_selem_set_playback_volume_all(elem, volume * max / 100);
 
   snd_mixer_close(handle);
-}
-
-void launchpadMidiCallback(double delta, std::vector<unsigned char> *_message, void *data)
-{
-  std::vector<unsigned char> message = *_message;
-
-  if (message[0] != 144)
-    return;
-  if (message[2] != 127)
-    return;
-  if ((message[1] - 8) % 16 != 0)
-    return;
-  // Change the volume
-  float newVolume = (float(message[1]) - 8.0) / 16.0 * (100.0 / 7.0);
-  SetAlsaMasterVolume(newVolume);
 }

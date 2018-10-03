@@ -1,0 +1,8 @@
+{
+  "files.associations": {
+    "*.ejs": "html",
+    "chrono": "c",
+    "limits": "c",
+    "algorithm": "c"
+  }
+}

@@ -2,3 +2,4 @@
 *.swp
 launchpad-mixer
 .vscode/
+obj/

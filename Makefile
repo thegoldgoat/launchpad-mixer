@@ -1,22 +1,38 @@
-all: launchpad-mixer
-
-WARNINGS = -Wall
-DEBUG = -ggdb -fno-omit-frame-pointer
-OPTIMIZE = -O2
-CCX = g++
+# Cose del compilatore
+CXX = g++
+CFLAGS = -std=c++11 -g
+# Oggetti
+OBJ = obj/launchpad-mixer.o obj/mixer.o
+# Cartelle sorgenti e oggetti
+OBJDIR = obj
+SRCDIR = src
+# Librerie da linkare
 LIBS = -lrtmidi -lasound
+# File eseguibile
+OUT = launchpad-mixer
 
-launchpad-mixer: Makefile launchpad-mixer.c
-	$(CCX) -o $@ $(WARNINGS) $(DEBUG) $(OPTIMIZE) $(LIBS) launchpad-mixer.c
+# Compile and run
+all: $(OUT) run
+
+# Compile
+$(OUT): $(OBJDIR) $(OBJ)
+	$(CXX) $(OBJ) -o $(OUT) $(CFLAGS) $(LIBS)
+
+$(OBJDIR):
+	mkdir -p $(OBJDIR)
+
+.PHONY: run
+run:
+	./$(OUT)
+
+$(OBJDIR)/%.o: $(SRCDIR)/%.cpp
+	$(CXX) $< -c -o $@ $(CFLAGS)
+
+.PHONY: clean
 
 clean:
-	rm -f launchpad-mixer
+	rm $(OBJDIR) -rf
+	rm $(OUT) -f
 
-# Builder will call this to install the application before running.
-install:
-	echo "Installing is not supported"
-
-# Builder uses this target to run your application.
-run:
-	./launchpad-mixer
-
+%.o: %.c $(DEPS)
+	$(CC) -c -o $@ $< $(CFLAGS)

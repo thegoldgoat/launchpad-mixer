@@ -16,18 +16,18 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <rtmidi/RtMidi.h>
 #include <alsa/asoundlib.h>
 #include <alsa/mixer.h>
+#include <rtmidi/RtMidi.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <iostream>
-#include <signal.h>
 #include <unistd.h>
+#include <iostream>
+#include "mixer.h"
 
 using namespace std;
 
-void SetAlsaMasterVolume(long volume);
 void setLaunchpadVolume(long volume);
 
 bool stillRunning = true;
@@ -36,8 +36,9 @@ RtMidiIn *midiInput = NULL;
 
 static void finish(int ignore) { stillRunning = false; }
 
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]) {
+  // Init mixer class
+  Mixer mixer;
 
   // Init launchpad
   midiInput = new RtMidiIn();
@@ -50,8 +51,7 @@ int main(int argc, char *argv[])
   int choosen;
   cin >> choosen;
 
-  if (choosen < 0 || choosen >= midiPortCount)
-  {
+  if (choosen < 0 || choosen >= midiPortCount) {
     cout << "Wrong port number.\n";
     exit(1);
   }
@@ -69,64 +69,34 @@ int main(int argc, char *argv[])
 
   // Signal handler
   signal(SIGINT, finish);
-  while (stillRunning)
-  {
+
+  setLaunchpadVolume(mixer.getMasterVolume());
+
+  while (stillRunning) {
     midiInput->getMessage(&message);
 
     usleep(10000);
 
-    if (message.size() != 3)
-      continue;
+    if (message.size() != 3) continue;
 
-    if (message[0] != 144)
-      continue;
-    if (message[2] != 127)
-      continue;
-    if ((message[1] - 8) % 16 != 0)
-      continue;
+    if (message[0] != 144) continue;
+    if (message[2] != 127) continue;
+    if ((message[1] - 8) % 16 != 0) continue;
     // Change the volume
     int pressedButton = 7 - (float(message[1]) - 8.0) / 16.0;
     float newVolume = pressedButton * (100.0 / 7.0);
-    SetAlsaMasterVolume(newVolume);
+    mixer.setMasterVolume(newVolume);
     setLaunchpadVolume(newVolume);
   }
 
   return EXIT_SUCCESS;
 }
 
-// Set the master volume, the parameter must be between 0 and 100
-void SetAlsaMasterVolume(long volume)
-{
-  long min, max;
-  snd_mixer_t *handle;
-  snd_mixer_selem_id_t *sid;
-  const char *card = "default";
-  const char *selem_name = "Master";
-
-  snd_mixer_open(&handle, 0);
-  snd_mixer_attach(handle, card);
-  snd_mixer_selem_register(handle, NULL, NULL);
-  snd_mixer_load(handle);
-
-  snd_mixer_selem_id_alloca(&sid);
-  snd_mixer_selem_id_set_index(sid, 0);
-  snd_mixer_selem_id_set_name(sid, selem_name);
-  snd_mixer_elem_t *elem = snd_mixer_find_selem(handle, sid);
-
-  snd_mixer_selem_get_playback_volume_range(elem, &min, &max);
-  snd_mixer_selem_set_playback_volume_all(elem, volume * max / 100);
-
-  snd_mixer_close(handle);
-}
-
-void setLaunchpadVolume(long volume)
-{
+void setLaunchpadVolume(long volume) {
   // Numbers to be shown in the launchpad
   int bottonNumber = volume / (100 / 7) + 1;
-  cout << bottonNumber << endl;
   std::vector<unsigned char> message(3);
-  for (int i = 0; i < 8; i++)
-  {
+  for (int i = 0; i < 8; i++) {
     message[0] = 144;
     message[1] = i * 16 + 8;
     message[2] = 8 - i <= bottonNumber ? 3 : 0;

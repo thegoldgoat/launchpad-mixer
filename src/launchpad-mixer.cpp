@@ -35,6 +35,7 @@ RtMidiOut *midiOutput = NULL;
 RtMidiIn *midiInput = NULL;
 
 static void finish(int ignore) { stillRunning = false; }
+void clearLaunchpad();
 
 int main(int argc, char *argv[]) {
   // Init mixer class
@@ -58,15 +59,9 @@ int main(int argc, char *argv[]) {
   midiInput->openPort(choosen);
   midiOutput->openPort(choosen);
 
+  clearLaunchpad();
+
   std::vector<unsigned char> message(3);
-
-  // Clear the launchpad
-  message[0] = 176;
-  message[1] = 0;
-  message[2] = 0;
-
-  midiOutput->sendMessage(&message);
-
   // Signal handler
   signal(SIGINT, finish);
 
@@ -89,6 +84,7 @@ int main(int argc, char *argv[]) {
     setLaunchpadVolume(newVolume);
   }
 
+  clearLaunchpad();
   return EXIT_SUCCESS;
 }
 
@@ -103,4 +99,12 @@ void setLaunchpadVolume(long volume) {
 
     midiOutput->sendMessage(&message);
   }
+}
+
+void clearLaunchpad() {
+  // Clear the launchpad
+  std::vector<unsigned char> message(3);
+  message[0] = 176;
+  message[1] = message[2] = 0;
+  midiOutput->sendMessage(&message);
 }
